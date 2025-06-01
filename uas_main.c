@@ -140,7 +140,10 @@ tbst *bst_delete(tbst *node, char deleteKey[])
     return node; 
 }
 
-
+void testing_pull_push()
+{
+    printf("\n\n");
+}
 
 int main(){
 
@@ -163,3 +166,4 @@ int main(){
     printf("\n\n");
     inorder(bst_root);
 } 
+
