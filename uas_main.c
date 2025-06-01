@@ -140,4 +140,24 @@ tbst *bst_delete(tbst *node, char deleteKey[])
     return node; 
 }
 
+int main(){
 
+    movie *arr_master_data; 
+    arr_master_data = malloc(sizeof(movie) * 100);
+    int n_master_data = 0; 
+
+    // fetching data
+    n_master_data = read_data(arr_master_data);
+    print_master_data(arr_master_data, n_master_data);
+
+
+    // create bst 
+    tbst *bst_root; 
+    bst_root = NULL; 
+
+    for(int i = 0; i < n_master_data; i++)
+        bst_root = bst_insert(bst_root, arr_master_data[i]);
+
+    printf("\n\n");
+    inorder(bst_root);
+} 
