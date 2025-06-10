@@ -1,0 +1,53 @@
+1,How to Train Your Dragon 2,Animation/Action,125,R13+,0
+2,Housefull 5,Comedy,162,D17+,0
+3,The Phoenician Scheme,Action/Thriller,101,R13+,0
+4,Tenung by Risa Saraswati & Dimasta,Horror,92,R13+,0
+5,Bring Her Back,Horror/Thriller,104,D21+,0
+6,Ballerina,Action/Thriller,124,D17+,0
+7,Gjls: Ibuku Ibu Ibu,Comedy/Drama,95,D17+,0
+8,The Dark House,Horror/Thriller,102,D17+,0
+9,Gowok Kamasutra Jawa Uncut,Drama/Thriller,132,D21+,0
+10,Sampai Jumpa, Selamat Tinggal,Drama/Romance,109,D17+,0
+11,Karate Kid: Legends,Action/Drama,94,R13+,0
+12,Lilo & Stitch,Sci-Fi/Comedy,108,SU,0
+13,Mission: Impossible - The Final Reckoning,Action/Thriller,169,R13+,0
+14,Dendam Malam Kelam,Horror/Thriller,103,D17+,0
+15,The Ritual,Horror,98,R13+,0
+16,Waktu Maghrib 2,Horror,107,D17+,0
+17,Tak Ingin Usai di Sini,Drama/Romance,108,R13+,0
+18,Gundik,Drama/Thriller,112,D17+,0
+19,Final Destination: Bloodlines,Horror/Thriller,110,D17+,0
+20,Jumbo,Animation/Comedy,102,SU,0
+21,28 Years Later,Horror/Sci-Fi,0,none,1
+22,Agen +62,Action/Comedy,0,none,1
+23,Angel Pol,Drama/Comedy,109,R13+,1
+24,Assalamualaikum Beijing 2: Lost in Ningxia,Drama/Romance,109,R13+,1
+25,Bad Genius,Thriller/Crime,96,R13+,1
+26,Bambi: A Tale of Life in the Woods,Animation/Drama,78,SU,1
+27,Bride Hard,Action/Comedy/Romance,0,none,1
+28,Doti - Tumbal Ilmu Hitam,Horror,82,R13+,1
+29,Elio,Animation/Sci-Fi,98,SU,1
+30,F1 The Movie,Action/Drama/Sport,0,none,1
+31,Hanya Namamu Dalam Doaku,Drama/Romance,0,none,1
+32,Hi-Five,Comedy,119,R13+,1
+33,How to Train Your Dragon,Animation/Action,125,R13+,1
+34,Jalan Pulang,Drama,97,D17+,1
+35,Jodoh 3 Bujang,Comedy/Romance,0,none,1
+36,Jurassic World: Rebirth,Action/Sci-Fi,0,none,1
+37,La Tahzan: Cinta Dosa Luka...,Drama/Romance,0,none,1
+38,Locked,Thriller,95,D17+,1
+39,Lorong Kost,Horror,0,none,1
+40,M3gan 2.0,Horror/Sci-Fi/Thriller,0,none,1
+41,Malam Jahanam,Horror,82,R13+,1
+42,Narik Sukmo,Horror,0,none,1
+43,Panji Tengkorak,Animation/Action,0,none,1
+44,Rego Nyowo,Drama/Action,0,none,1
+45,Runt,Family,91,R13+,1
+46,Senyum Manies Love Story,Drama/Romance,95,R13+,1
+47,Seribu Bayang Purnama,Drama,128,SU,1
+48,Sore Istri Dari Masa Depan,Drama/Romance,119,R13+,1
+49,Syirik (Danyang Laut Selatan),Horror,0,none,1
+50,The Dark House,Horror/Thriller,102,D17+,1
+51,Tinggal Meninggal,Comedy/Horror,0,none,1
+52,Virus,Horror/Thriller,98,R13+,1
+53,Warkop DKI Kartun,Animation/Comedy,0,none,1
