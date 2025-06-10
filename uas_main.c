@@ -17,7 +17,7 @@
 #define MAX_LOCATIONS 20
 #define MAX_CINEMAS 300
 #define MAX_MOVIES 100
-#define MAX_SHOWTIMES 200
+#define MAX_SHOWTIMES 500
 
 
 typedef struct {
@@ -78,11 +78,11 @@ int change_location(Location locations[], int location_count);
 int find_cinemas_index(Cinema cinemas[], int cinema_count, int location_id);
 void print_cinemas(Cinema cinemas[], int index);
 void print_movies(Movie movies[], int movie_count, int upcoming, int current_film);
-void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count);
+void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id);
 
 
 void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime showtimes[], int showtime_count);
-int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id);
+int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id, int location_id);
 
 
 // =================================================================================
@@ -142,7 +142,7 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                 break; 
             case 2:
                 clear_screen();
-                film_menu(movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count);
+                film_menu(movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count, current_location_id);
                 break; 
             case 3: 
                 clear_screen();
@@ -163,7 +163,7 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
     } while(choice != 0);
 }
 
-void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count) {
+void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id) {
     int choice;
     int current_film = 1;
     int selected_cinema_id;
@@ -173,7 +173,7 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
         printf("====================================================\n");
         printf("                   FILM MAIN MENU                   \n");
         printf("====================================================\n");
-        printf("[0] Exit\n");
+        printf("[0] Back\n");
         printf("[1] Akan tayang\n");
         printf("[2] Pilih film\n");
         printf("[3] Beli tiket\n");
@@ -204,7 +204,7 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
                 break;
             case 3:
                 clear_screen();
-                selected_cinema_id = select_cinema(showtimes, showtime_count, cinemas, cinema_count, selected_movie_id);
+                selected_cinema_id = select_cinema(showtimes, showtime_count, cinemas, cinema_count, selected_movie_id, location_id);
                 buy_ticket_flow(selected_movie_id, selected_cinema_id, showtimes, showtime_count);
                 break;
 
@@ -318,20 +318,30 @@ void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime sho
     // Lanjutkan ke langkah b...
 }
 
-int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id) {
+int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id, int location_id) {
 
     int k = 1;
     int choice;
-    int cinemas_index[MAX_CINEMAS];
+    int cinemas_id[MAX_CINEMAS];
 
     printf("Film tayang di: \n");
     for(int i = 0; i < showtime_count; i++) {
         if (selected_movie_id == showtimes[i].movie_id) {
             for(int j = 0; j < cinema_count; j++) {
-                if (cinemas[j].cinema_id == showtimes[i].cinema_id) {
-                    cinemas_index[k] = cinemas[j].cinema_id; 
-                    printf("%d. %s\n", k, cinemas[j].name);
-                    k++;
+                if (cinemas[j].cinema_id == showtimes[i].cinema_id && cinemas[j].location_id == location_id) {
+                    int flag = 0;
+                    for (int p = 1; p <= k; p++) {
+                        if (cinemas[j].cinema_id == cinemas_id[p]) {
+                            flag = 1;
+                            break;
+                        }
+                        
+                    }
+                    if (!flag) {
+                        cinemas_id[k] = cinemas[j].cinema_id; 
+                        printf("%d. %s\n", k, cinemas[j].name);
+                        k++;
+                    }
                 } 
             }
         }
@@ -342,9 +352,9 @@ int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], in
     scanf("%d", &choice);
     clean_input_buffer();
 
-    printf("K : %d, C ID : %d\n", k, cinemas_index[k]);
+    //printf("K : %d, C ID : %d\n", k, cinemas_id[k]);
 
-    return cinemas_index[choice];
+    return cinemas_id[choice];
 }
 
 int change_location(Location locations[], int location_count) {
