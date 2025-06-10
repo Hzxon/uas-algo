@@ -2,164 +2,388 @@
 #include <stdlib.h> 
 #include <string.h> 
 
-typedef struct movie {
-    char judul[100];
-    char genre[50];
-    int durasi; 
-    float rating;
+
+// =================================================================================
+// BAGIAN 1: DEFINISI STRUCT & KONSTANTA
+// =================================================================================
+
+#define MAX_NAME_LEN 100
+#define MAX_GENRE_LEN 50
+#define MAX_AGE_RATING_LEN 10
+#define MAX_LINE_BUFFER 2048
+#define MAX_DATETIME_LEN 30
+
+
+#define MAX_LOCATIONS 20
+#define MAX_CINEMAS 300
+#define MAX_MOVIES 100
+
+
+typedef struct {
+    int location_id; 
+    char name[MAX_NAME_LEN];
+} Location; 
+
+typedef struct {
+    int cinema_id; 
+    int location_id; 
+    char name[MAX_NAME_LEN];
+} Cinema; 
+
+typedef struct {
+    int movie_id; 
+    char title[MAX_NAME_LEN];
+    char genre[MAX_GENRE_LEN];
+    int duration_minutes; 
+    char age_rating[MAX_AGE_RATING_LEN];
     int upcoming; 
-} movie;
+} Movie;
+
+typedef struct {
+    int show_id; 
+    int movie_id; 
+    int cinema_id; 
+    char show_time[MAX_DATETIME_LEN];
+    int price; 
+} Showtime; 
 
 typedef struct tbst {
     char judul[100];
     struct tbst *left, *right;  
 } tbst; 
 
-int read_data(movie *arr)
-{
-    FILE *fin = fopen("data_film.txt", "r");
 
-    if (fin == NULL) {
-        printf("Error opening resources data file!\n");
-        return 0; 
-    }
 
-    int i = 0; 
+// =================================================================================
+// BAGIAN 2: DEKLARASI FUNGSI (PROTOTYPES)
+// =================================================================================
 
-    while(fscanf(fin, "%[^#]#%[^#]#%d#%f#%d\n", arr[i].judul, arr[i].genre, &arr[i].durasi, &arr[i].rating, &arr[i].upcoming) == 5)
-        i++;
 
-    fclose(fin);
+// --- Utilitas ---
+void clear_screen();
+void press_enter_to_continue();
+void clean_input_buffer();
 
-    return i; 
+// --- File I/O untuk file .txt ---
+int load_locations_from_txt(const char* filename, Location locations[], int max_items);
+int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items);
+int load_movies_from_txt(const char* filename, Movie movies[], int max_items);
+
+// --- Logika Aplikasi & Menu ---
+void load_all_data(Location all_locations[], Cinema all_cinemas[], Movie all_movies[], int *location_count, int *cinema_count, int *movie_count);
+void main_menu(Location locations[], Cinema cinemas[], Movie movies[], int *location_count, int *cinema_count, int *movie_count);
+int change_location(Location locations[], int location_count);
+int find_cinemas_index(Cinema cinemas[], int cinema_count, int location_id);
+void print_cinemas(Cinema cinemas[], int index);
+void print_movies(Movie movies[], int movie_count, int upcoming, int current_film);
+void film_menu(Movie movies[], int movie_count);
+
+
+
+
+
+// =================================================================================
+// BAGIAN 4: IMPLEMENTASI FUNGSI UTAMA & MENU
+// =================================================================================
+
+int main() {
+    Location all_locations[MAX_LOCATIONS];
+    Cinema all_cinemas[MAX_CINEMAS];
+    Movie all_movies[MAX_MOVIES];
+
+    int location_count = 0; 
+    int cinema_count = 0; 
+    int movie_count = 0; 
+
+    load_all_data(all_locations, all_cinemas, all_movies, &location_count, &cinema_count, &movie_count);
+    main_menu(all_locations, all_cinemas, all_movies, &location_count, &cinema_count, &movie_count);
+
+    return 0; 
 }
 
-void print_master_data(movie *arr, int n_data)
-{
-    if (n_data == 0 || arr == NULL) return; 
+void main_menu(Location locations[], Cinema cinemas[], Movie movies[], int *location_count, int *cinema_count, int *movie_count) {
+    int choice; 
+    int current_location_id = 1;
+    int current_location_index = 0;
+    int current_cinemas_index; 
+    do {
+        printf("====================================================\n");
+        printf("                 CINEMA XXI - GROUP 2              \n");
+        printf("====================================================\n");
+        printf("Location: %s\n", locations[current_location_index].name);
+        printf("[0] Exit\n");
+        printf("[1] Bioskop\n");
+        printf("[2] Film\n");
+        printf("[3] m.food\n");
+        printf("[4] Pesanan Saya\n");
+        printf("[5] Change location\n");
+        printf("----------------------------------------------------\n");
+        printf("Pilihan Anda: ");
 
-    for(int i = 0; i < n_data; i++){
-        printf("%d. Judul : %s\n", i+1, arr[i].judul);
-    } 
-}
-
-tbst *bst_createNewNode(movie data)
-{
-    tbst *newNode = (tbst *)malloc(sizeof(tbst));
-
-    if (newNode == NULL){
-        printf("Gagal mengalokasi memori!\n");
-    }
-
-    newNode->left = newNode->right = NULL; 
-    strcpy(newNode->judul, data.judul);
-
-    return newNode;
-}
-
-tbst *bst_insert(tbst *node, movie data)
-{
-    if (node == NULL) 
-        return bst_createNewNode(data);
-
-    int cmp = strcmp(data.judul, node->judul);
-
-    if (cmp < 0) 
-        node->left = bst_insert(node->left, data);
-        
-    else if (cmp > 0)
-        node->right = bst_insert(node->right, data);
-
-    return node; 
-}
-
-void inorder(tbst *node)
-{
-    if (node != NULL) {
-        inorder(node->left);
-        printf("Judul : %s\n", node->judul);
-        inorder(node->right);
-    }
-}
-
-void bst_searching(tbst *node, char searchKey[])
-{
-    if (node == NULL) return; 
-
-    int cmp = strcmp(searchKey, node->judul);
-
-    if (cmp == 0) {
-        printf("Film berjudul %s ditemukan!\n", node->judul);
-        return;
-    } else if (cmp < 0) {
-        bst_searching(node->left, searchKey);
-    } else {
-        bst_searching(node->right, searchKey);
-    }
-}
-
-tbst *bst_minValueNode(tbst *node)
-{
-    while(node && node->left)
-        node = node->left; 
-
-    return node; 
-}
-
-tbst *bst_delete(tbst *node, char deleteKey[])
-{
-    if (node == NULL) return node;
-
-    int cmp = strcmp(deleteKey, node->judul);
-
-    if (cmp < 0) node->left = bst_delete(node->left, deleteKey);
-
-    else if (cmp > 0) node->right = bst_delete(node->right, deleteKey);
-
-    else {
-        
-        if (node->left == NULL) {
-            tbst *temp = node->right; 
-            free(node);
-            return temp;  
-        } 
-        else if (node->right == NULL) {
-            tbst *temp = node->left; 
-            free(node);
-            return temp;
+        if(scanf("%d", &choice) != 1) {
+            choice = -1; 
+            clean_input_buffer();
         }
-        
-        // temp tidak mungkin NULL, karena sudah di cek di awal func. 
-        tbst *temp = bst_minValueNode(node->right);
 
-        strcpy(node->judul, temp->judul);
+        switch(choice) {
+            case 0:
+                clear_screen();
+                printf("Thankyou, see you next time!\n");
+                break; 
+            case 1: 
+                clear_screen();
+                current_cinemas_index = find_cinemas_index(cinemas, *cinema_count, current_location_id); 
+                print_cinemas(cinemas, current_cinemas_index);
+                break; 
+            case 2:
+                clear_screen();
+                film_menu(movies, *movie_count);
+                break; 
+            case 3: 
+                clear_screen();
+                break; 
+            case 4: 
+                clear_screen();
+                break;
+            case 5: 
+                clear_screen();
+                current_location_index = change_location(locations, *location_count);
+                current_location_id = locations[current_location_index].location_id;
+                break; 
+            default: 
+                printf("Input tidak valid!\n");
+                press_enter_to_continue();
+                break; 
+        } 
+    } while(choice != 0);
+}
 
-        node->right = bst_delete(node->right, temp->judul);
+void film_menu(Movie movies[], int movie_count) {
+    int choice;
+    int current_film = 1;
+    do {
+        print_movies(movies, movie_count, 0, current_film);
+        printf("====================================================\n");
+        printf("                   FILM MAIN MENU                   \n");
+        printf("====================================================\n");
+        printf("[0] Exit\n");
+        printf("[1] Akan tayang\n");
+        printf("[2] Pilih film\n");
+        printf("[3] Beli tiket\n");
+        printf("[4] \n");
+        printf("----------------------------------------------------\n");
+        printf("Pilihan Anda: ");
+
+        if(scanf("%d", &choice) != 1) {
+            choice = -1; 
+            clean_input_buffer();
+        }
+
+        switch (choice) {
+            case 0: 
+                clear_screen();
+                break; 
+            case 1:
+                clear_screen();
+                print_movies(movies, movie_count, 1, 0);
+                press_enter_to_continue();
+                clear_screen();
+                break; 
+            case 2:
+                printf("Masukkan nomor film: ");
+                scanf("%d", &current_film);
+                clean_input_buffer();
+                clear_screen();
+                break;
+            case 3:
+                break;
+
+            default: 
+                printf("Input tidak valid!\n");
+                press_enter_to_continue();
+                break; 
+        } 
+    } while(choice != 0);
+}
+
+void load_all_data(Location all_locations[], Cinema all_cinemas[], Movie all_movies[], int *location_count, int *cinema_count, int *movie_count) {
+    printf("Fetching all data from .txt...\n");
+    *location_count = load_locations_from_txt("locations.txt", all_locations, MAX_LOCATIONS);
+    *cinema_count = load_cinemas_from_txt("cinemas.txt", all_cinemas, MAX_CINEMAS);
+    *movie_count = load_movies_from_txt("movies.txt", all_movies, MAX_MOVIES);
+    printf("Successfully load all data. (Location: %d, Cinema: %d, Movie: %d)\n", *location_count, *cinema_count, *movie_count);
+}
+
+// =================================================================================
+// BAGIAN 5: IMPLEMENTASI FILE I/O UNTUK .TXT
+// =================================================================================
+int load_locations_from_txt(const char* filename, Location locations[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %[^\n]\n", &locations[count].location_id, locations[count].name) == 2) {
+        count++; 
     }
 
-    return node; 
+    fclose(fp);
+    return count; 
+}
+
+int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %d, %[^\n]\n", &cinemas[count].cinema_id, &cinemas[count].location_id, cinemas[count].name) == 3) {
+        count++;
+    }
+
+    fclose(fp);
+    return count; 
+}
+
+// --- Film ---
+int load_movies_from_txt(const char* filename, Movie movies[], int max_items) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line_buffer[MAX_LINE_BUFFER];
+    while(count < max_items && fgets(line_buffer, sizeof(line_buffer), fp)) {
+        sscanf(line_buffer, "%d,%[^,],%[^,],%d,%[^,],%d",
+               &movies[count].movie_id, movies[count].title, movies[count].genre,
+               &movies[count].duration_minutes, movies[count].age_rating, &movies[count].upcoming);
+        count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+// =================================================================================
+// BAGIAN 6: IMPLEMENTASI LOGIKA APLIKASI
+// =================================================================================
+
+void buy_ticket_flow(int selected_movie_id, int selected_cinema_id) {
+    clear_screen();
+    printf("=== Jadwal Tayang Tersedia ===\n");
+
+    int available_shows[MAX_SHOWTIMES];
+    int show_count = 0;
+
+    // 1. Cari semua jadwal yang cocok
+    for (int i = 0; i < showtime_count; i++) {
+        if (all_showtimes[i].movie_id == selected_movie_id && all_showtimes[i].cinema_id == selected_cinema_id) {
+            available_shows[show_count] = i; // Simpan indeksnya
+            show_count++;
+        }
+    }
+
+    if (show_count == 0) {
+        printf("Maaf, tidak ada jadwal tayang untuk film ini di bioskop yang dipilih.\n");
+        press_enter_to_continue();
+        return;
+    }
+
+    // 2. Tampilkan jadwal yang ditemukan
+    for (int i = 0; i < show_count; i++) {
+        int show_index = available_shows[i];
+        printf("[%d] Waktu: %s - Harga: Rp %d\n", i + 1, all_showtimes[show_index].show_time, all_showtimes[show_index].price);
+    }
+    printf("[0] Batal\n");
+
+    // Lanjutkan ke langkah b...
+}
+
+int select_cinema() {
+
+    for(int i = 0; i < showtime_count; i++) {
+        if (selected_movie_id == showtimes[i].movie_id) {
+            printf("%s\n")
+        }
+    }
+}
+
+int change_location(Location locations[], int location_count) {
+
+    int index; 
+
+    printf("Location count %d\n", location_count);
+
+    for(int i = 0; i < location_count; i++) {
+        printf("[%d] %s\n", i+1, locations[i].name);
+    }
+
+    printf("Select location (number): ");
+    scanf("%d", &index);
+
+    return index-1; 
+}
+
+int find_cinemas_index(Cinema cinemas[], int cinema_count, int location_id) {
+    int index; 
+
+    for(int i = 0; i < cinema_count; i++)
+        if (cinemas[i].location_id == location_id) {
+            index = i;
+            break;
+        }
+
+    return index; 
+}
+
+void print_cinemas(Cinema cinemas[], int index) {
+
+    int j = 1;
+    for(int i = index; cinemas[i].location_id == cinemas[index].location_id; i++) {
+        printf("%d. %s\n", j, cinemas[i].name);
+        j++;
+    }
+
+}
+
+void print_movies(Movie movies[], int movie_count, int upcoming, int current_film) {
+    
+    if (movie_count <= 0) return;
+
+    if (upcoming)
+        printf("Akan tayang\n");
+    else 
+        printf("Lagi tayang\n");
+
+    for(int i = 0; i < movie_count; i++) {
+        if (upcoming && movies[i].upcoming)
+            printf("%d. %s\n", (i-20)+1, movies[i].title);
+        else if (!upcoming && !movies[i].upcoming) {
+            if (current_film == i+1) printf("-->");
+            printf("%d. %s\n", i+1, movies[i].title);
+        }
+    }
 }
 
 
-int main(){
-
-    movie *arr_master_data; 
-    arr_master_data = malloc(sizeof(movie) * 100);
-    int n_master_data = 0; 
-
-    // fetching data
-    n_master_data = read_data(arr_master_data);
-    print_master_data(arr_master_data, n_master_data);
+// =================================================================================
+// BAGIAN 7: UTILITAS INTERNAL & INISIALISASI DATA
+// =================================================================================
 
 
-    // create bst 
-    tbst *bst_root; 
-    bst_root = NULL; 
 
-    for(int i = 0; i < n_master_data; i++)
-        bst_root = bst_insert(bst_root, arr_master_data[i]);
+void clean_input_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
 
-    printf("\n\n");
-    inorder(bst_root);
-} 
 
+
+void clear_screen() {
+    #ifdef _WIN32
+        system("cls");
+    #else
+        system("clear");
+    #endif
+}
+
+void press_enter_to_continue() {
+    printf("\nTekan Enter untuk melanjutkan...");
+    clean_input_buffer();
+    getchar();
+}
