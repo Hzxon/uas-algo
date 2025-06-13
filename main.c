@@ -128,7 +128,7 @@ MaxHeap* createHeap(int capacity);
 void insertIntoHeap(MaxHeap* heap, Booking new_booking);
 void viewRecentBookings(MaxHeap* heap, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count);
 void freeHeap(MaxHeap* heap);
-void deleteFromHeap(MaxHeap* heap, int booking_id_to_delete);
+void deleteMaxFromHeap(MaxHeap* heap);
 
 
 // --- Binary Search ---
@@ -1114,92 +1114,72 @@ void siftDown(Booking arr[], int size, int index) {
 
 void viewRecentBookings(MaxHeap* heap, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count) {
 
-    int choice; 
-    do {
-        print_header("RIWAYAT PESANAN dari TERBARU");
-        if (heap->size == 0) {
-            printf("Belum ada pesanan yang dibuat dalam sesi ini.\n");
-            press_enter_to_continue();
-            return;
-        }
+    print_header("RIWAYAT PESANAN dari TERBARU");
+    if (heap->size == 0) {
+        printf("Belum ada pesanan yang dibuat dalam sesi ini.\n");
+        press_enter_to_continue();
+        return;
+    }
 
-        Booking temp_array[heap->size];
-        memcpy(temp_array, heap->array, heap->size * sizeof(Booking));
-        int temp_size = heap->size;
+    Booking temp_array[heap->size];
+    memcpy(temp_array, heap->array, heap->size * sizeof(Booking));
+    int temp_size = heap->size;
 
-        for (int i = 0; i < heap->size; i++) {
-            Booking b = temp_array[0];
+    for (int i = 0; i < heap->size; i++) {
+        Booking b = temp_array[0];
 
-            print_divider();
-            char* title = "N/A"; char* cinema_name = "N/A"; char* show_time = "N/A";
-            for(int k = 0; k < showtime_count; k++){
-                if(showtimes[k].show_id == b.show_id){
-                    show_time = showtimes[k].show_time;
-                    for(int j = 0; j<movie_count; j++) 
-                        if(movies[j].movie_id == showtimes[k].movie_id) title = movies[j].title;
-                    for(int j = 0; j<cinema_count; j++) 
-                        if(cinemas[j].cinema_id == showtimes[k].cinema_id) cinema_name = cinemas[j].name;
-                    break;
-                }
-            }
-            printf("Pengguna: %s (ID Pesanan: %d)\n", b.user, b.booking_id);
-            printf("Film    : %s\n", title);
-            printf("Bioskop : %s @ %s\n", cinema_name, show_time);
-            
-            if (i < temp_size - 1) {
-                temp_array[0] = temp_array[temp_size - 1];
-                temp_size--;
-                siftDown(temp_array, temp_size, 0);
-            }
-        }
-       
         print_divider();
-        printf("\n[1] Hapus riwayat terbaru\n");
-        printf("[0] Kembali\n");
-        printf("Pilihan Anda: ");
-        scanf("%d", &choice);
-
-        if (choice == 1) {
-            printf("Masukkan nomor pesanan yang ingin dibatalkan: ");
-            int booking_to_delete;
-            clean_input_buffer();
-            scanf("%d", &booking_to_delete);
-            clean_input_buffer();
-
-            if(booking_to_delete > 0 && booking_to_delete <= heap->size){
-                deleteFromHeap(heap, booking_to_delete);
-                
-            } else {
-                printf("Nomor pesanan tidak valid.\n");
+        char* title = "N/A"; char* cinema_name = "N/A"; char* show_time = "N/A";
+        for(int k = 0; k < showtime_count; k++){
+            if(showtimes[k].show_id == b.show_id){
+                show_time = showtimes[k].show_time;
+                for(int j = 0; j<movie_count; j++) 
+                    if(movies[j].movie_id == showtimes[k].movie_id) title = movies[j].title;
+                for(int j = 0; j<cinema_count; j++) 
+                    if(cinemas[j].cinema_id == showtimes[k].cinema_id) cinema_name = cinemas[j].name;
+                break;
             }
-            press_enter_to_continue();
-        } 
+        }
+        printf("Pengguna: %s (ID Pesanan: %d)\n", b.user, b.booking_id);
+        printf("Film    : %s\n", title);
+        printf("Bioskop : %s @ %s\n", cinema_name, show_time);
+        
+        if (i < temp_size - 1) {
+            temp_array[0] = temp_array[temp_size - 1];
+            temp_size--;
+            siftDown(temp_array, temp_size, 0);
+        }
+    }
+   
+    print_divider();
+    printf("\n[1] Hapus riwayat terbaru\n");
+    printf("[0] Kembali\n");
+    printf("Pilihan Anda: ");
+    int choice;
+    scanf("%d", &choice);
 
-    } while(choice != 0);
+    if (choice == 1) {
+        deleteMaxFromHeap(heap);
+        press_enter_to_continue();
+    } 
 }
 
-void deleteFromHeap(MaxHeap* heap, int booking_id_to_delete) {
-    if (heap->size == 0) return;
 
-    int index_to_delete = -1;
-    for (int i = 0; i < heap->size; i++) {
-        if (heap->array[i].booking_id == booking_id_to_delete) {
-            index_to_delete = i;
-            break;
-        }
+void deleteMaxFromHeap(MaxHeap* heap) {
+    if (heap->size == 0) {
+        printf("Riwayat pesanan kosong, tidak ada yang bisa dihapus.\n");
+        return;
     }
-    
-    if (index_to_delete == -1) return; 
 
-    heap->array[index_to_delete] = heap->array[heap->size - 1];
+    int deleted_booking_id = heap->array[0].booking_id;
+
+    heap->array[0] = heap->array[heap->size - 1];
+
     heap->size--;
+    // Panggil siftDown untuk memperbaiki struktur heap dari atas
+    siftDown(heap->array, heap->size, 0);
 
-    int parent = (index_to_delete - 1) / 2;
-    if (index_to_delete > 0 && heap->array[parent].booking_id < heap->array[index_to_delete].booking_id) {
-        siftUp(heap, index_to_delete);
-    } else {
-        siftDown(heap->array, heap->size, index_to_delete);
-    }
+    printf("Riwayat teratas dengan ID Pesanan %d berhasil dihapus.\n", deleted_booking_id);
 }
 
 void freeHeap(MaxHeap* heap) {
