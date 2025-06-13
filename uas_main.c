@@ -20,13 +20,11 @@
 #define MAX_SEATS_PER_BOOKING 10
 #define MAX_PASSWORD_LEN 20
 
-
 #define MAX_LOCATIONS 20
 #define MAX_CINEMAS 300
 #define MAX_MOVIES 100
 #define MAX_SHOWTIMES 500
 #define MAX_BOOKINGS 500
-
 
 typedef struct {
     int location_id; 
@@ -93,6 +91,7 @@ void press_enter_to_continue();
 void clean_input_buffer();
 void print_header(const char* text);
 void print_divider();
+void swap_movies(Movie *a, Movie *b);
 
 // --- File I/O untuk file .txt ---
 int load_locations_from_txt(const char* filename, Location locations[], int max_items);
@@ -112,8 +111,9 @@ void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime sho
 int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id, int location_id);
 void seat_selection_flow(Showtime *selected_showtime, int seat_number, char *seat_temp);
 void display_seat_map(Showtime selected_showtime);
-void merge_sort_movies(Movie arr[], int l, int r, int ascending);
+void merge_sort_movies(Movie arr[], int l, int r);
 void merge_sort_cinemas(Cinema arr[], int l, int r);
+void selection_sort_movies_desc(Movie arr[], int n);
 
 // --- BST ---
 UserBookingsNode* addUserBooking(UserBookingsNode* root, Booking new_booking);
@@ -168,10 +168,9 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
     UserBookingsNode *bookings_root = NULL;
     MaxHeap* recent_bookings_heap = createHeap(MAX_BOOKINGS);
 
-
     Movie sorted_movies_ascending[MAX_MOVIES];
     memcpy(sorted_movies_ascending, movies, sizeof(Movie) * (*movie_count));
-    merge_sort_movies(sorted_movies_ascending, 0, *movie_count-1, 1);
+    merge_sort_movies(sorted_movies_ascending, 0, *movie_count-1);
 
     Cinema sorted_cinemas_ascending[MAX_CINEMAS];
     memcpy(sorted_cinemas_ascending, cinemas, sizeof(Cinema) * (*cinema_count));
@@ -274,9 +273,9 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
     int choice;
     Movie sorted_movies[MAX_MOVIES];
     memcpy(&sorted_movies, movies, sizeof(Movie));
-    int current_film = 9;
+    int current_film;
     int selected_cinema_id;
-    int selected_movie_id = 1;
+    int selected_movie_id;
     int sort_ascending = 1;
 
     do {
@@ -320,6 +319,8 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
                 break;
             case 4: 
                 sort_ascending = !sort_ascending; 
+                current_film = selected_movie_id = -1;
+                clear_screen();
                 break; 
             default: 
                 printf("Input tidak valid!\n");
@@ -459,58 +460,6 @@ int binary_search_cinema(Cinema cinemas[], int count, const char* target) {
     return -1;
 }
 
-// =================================================================================
-// BAGIAN 4: IMPLEMENTASI FILE I/O UNTUK .TXT
-// =================================================================================
-int load_locations_from_txt(const char* filename, Location locations[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d, %[^\n]\n", &locations[count].location_id, locations[count].name) == 2) { count++; }
-
-    fclose(fp);
-    return count; 
-}
-
-int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d, %d, %[^\n]\n", &cinemas[count].cinema_id, &cinemas[count].location_id, cinemas[count].name) == 3) { count++; }
-
-    fclose(fp);
-    return count; 
-}
-
-int load_movies_from_txt(const char* filename, Movie movies[], int max_items) {
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0;
-    int count = 0;
-    char line_buffer[MAX_LINE_BUFFER];
-    while(count < max_items && fgets(line_buffer, sizeof(line_buffer), fp)) {
-        sscanf(line_buffer, "%d, %[^,], %[^,], %d, %[^,], %d",
-               &movies[count].movie_id, movies[count].title, movies[count].genre,
-               &movies[count].duration_minutes, movies[count].age_rating, &movies[count].upcoming);
-        count++;
-    }
-
-    fclose(fp);
-    return count;
-}
-
-int load_showtimes_from_txt(const char* filename, Showtime showtimes[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d, %d, %d, %[^,], %d", &showtimes[count].show_id, &showtimes[count].movie_id, &showtimes[count].cinema_id, showtimes[count].show_time, &showtimes[count].price) == 5) { count++; }
-
-    fclose(fp);
-    return count; 
-}
- 
 // =================================================================================
 // BAGIAN 5: IMPLEMENTASI LOGIKA APLIKASI
 // =================================================================================
@@ -805,7 +754,11 @@ void print_movies(Movie movies[], int movie_count, int upcoming, int current_fil
         }
     }
 
-    merge_sort_movies(sorted_movies, 0, temp_count - 1, ascending);
+    if (ascending) {
+        merge_sort_movies(sorted_movies, 0, temp_count - 1);
+    } else {
+        selection_sort_movies_desc(sorted_movies, temp_count);
+    }
 
     if (upcoming)
         printf("Akan tayang\n");
@@ -813,15 +766,13 @@ void print_movies(Movie movies[], int movie_count, int upcoming, int current_fil
         printf("Lagi tayang\n");
 
     for (int i = 0; i < temp_count; i++) {
-        if (!upcoming && current_film == i + 1) printf("%-3s [%2d] %-20s\n", "-->", i+1, movies[i].title);
-        else printf("%-3s [%2d] %-20s\n", "   ", i+1, movies[i].title);
+        if (!upcoming && current_film == i + 1) printf("%-3s [%2d] %-20s\n", "-->", i+1, sorted_movies[i].title);
+        else printf("%-3s [%2d] %-20s\n", "   ", i+1, sorted_movies[i].title);
 
     }
 }
 
-
-
-void merge(Movie arr[], int l, int m, int r, int ascending) {
+void merge(Movie arr[], int l, int m, int r) {
     int i, j, k;
     int n1 = m - l + 1;
     int n2 = r - m;
@@ -839,7 +790,7 @@ void merge(Movie arr[], int l, int m, int r, int ascending) {
 
     while (i < n1 && j < n2) {
         int cmp = strcasecmp(L[i].title, R[j].title);
-        if ((ascending && cmp <= 0) || (!ascending && cmp > 0)) {
+        if (cmp <= 0) {
             arr[k++] = L[i++];
         } else {
             arr[k++] = R[j++];
@@ -850,12 +801,12 @@ void merge(Movie arr[], int l, int m, int r, int ascending) {
     while (j < n2) arr[k++] = R[j++];
 }
 
-void merge_sort_movies(Movie arr[], int l, int r, int ascending) {
+void merge_sort_movies(Movie arr[], int l, int r) {
     if (l < r) {
         int m = l + (r - l) / 2;
-        merge_sort_movies(arr, l, m, ascending);
-        merge_sort_movies(arr, m + 1, r, ascending);
-        merge(arr, l, m, r, ascending);
+        merge_sort_movies(arr, l, m);
+        merge_sort_movies(arr, m + 1, r);
+        merge(arr, l, m, r);
     }
 }
 
@@ -883,6 +834,23 @@ void merge_sort_cinemas(Cinema arr[], int l, int r) {
         merge_sort_cinemas(arr, l, m);
         merge_sort_cinemas(arr, m + 1, r);
         merge_cinemas(arr, l, m, r);
+    }
+}
+
+void selection_sort_movies_desc(Movie arr[], int n) {
+    int i, j, max_idx;
+
+    for (i = 0; i < n - 1; i++) {
+        max_idx = i;
+
+        for (j = i + 1; j < n; j++) {
+            if (strcasecmp(arr[j].title, arr[max_idx].title) > 0) {
+                max_idx = j;
+            }
+        }
+        if (max_idx != i) {
+            swap_movies(&arr[i], &arr[max_idx]);
+        }
     }
 }
 
@@ -993,7 +961,6 @@ UserBookingsNode* deleteUserNode(UserBookingsNode* root, const char* user_key) {
     }
     return root;
 }
-
 
 void view_my_bookings(UserBookingsNode** bookings_root_ptr, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count) {
     print_header("PESANAN SAYA");
@@ -1249,6 +1216,59 @@ void freeHeap(MaxHeap* heap) {
     free(heap);
 }
 
+
+// =================================================================================
+// BAGIAN 8: IMPLEMENTASI FILE I/O UNTUK .TXT
+// =================================================================================
+int load_locations_from_txt(const char* filename, Location locations[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %[^\n]\n", &locations[count].location_id, locations[count].name) == 2) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
+int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %d, %[^\n]\n", &cinemas[count].cinema_id, &cinemas[count].location_id, cinemas[count].name) == 3) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
+int load_movies_from_txt(const char* filename, Movie movies[], int max_items) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line_buffer[MAX_LINE_BUFFER];
+    while(count < max_items && fgets(line_buffer, sizeof(line_buffer), fp)) {
+        sscanf(line_buffer, "%d, %[^,], %[^,], %d, %[^,], %d",
+               &movies[count].movie_id, movies[count].title, movies[count].genre,
+               &movies[count].duration_minutes, movies[count].age_rating, &movies[count].upcoming);
+        count++;
+    }
+
+    fclose(fp);
+    return count;
+}
+
+int load_showtimes_from_txt(const char* filename, Showtime showtimes[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %d, %d, %[^,], %d", &showtimes[count].show_id, &showtimes[count].movie_id, &showtimes[count].cinema_id, showtimes[count].show_time, &showtimes[count].price) == 5) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
 // =================================================================================
 // BAGIAN 9: UTILITAS INTERNAL
 // =================================================================================
@@ -1282,4 +1302,8 @@ void press_enter_to_continue() {
     getchar();
 }
 
-
+void swap_movies(Movie *a, Movie *b) {
+    Movie temp = *a;
+    *a = *b;
+    *b = temp;
+}
