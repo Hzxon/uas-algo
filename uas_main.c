@@ -3,6 +3,7 @@
 #include <string.h> 
 #include <ctype.h>
 #include <stdbool.h>
+#include <strings.h> 
 
 
 // =================================================================================
@@ -17,14 +18,13 @@
 #define MAX_COLS 16
 #define MAX_ROWS 8
 #define MAX_SEATS_PER_BOOKING 10
-
+#define MAX_PASSWORD_LEN 20
 
 #define MAX_LOCATIONS 20
 #define MAX_CINEMAS 300
 #define MAX_MOVIES 100
 #define MAX_SHOWTIMES 500
 #define MAX_BOOKINGS 500
-
 
 typedef struct {
     int location_id; 
@@ -58,23 +58,32 @@ typedef struct {
 typedef struct {
     int booking_id;
     char user[MAX_NAME_LEN];
-    int show_id;        // Foreign key ke Showtime.show_id
+    int show_id;
     char selected_seats[MAX_SEATS_PER_BOOKING][5];
     int num_selected_seats;
     int total_price;
 } Booking;
 
-typedef struct tbst {
-    char judul[100];
-    struct tbst *left, *right;  
-} tbst; 
+typedef struct BookingNode {
+    Booking booking_data;
+    struct BookingNode *next;
+} BookingNode;
 
+typedef struct UserBookingsNode {
+    char user[MAX_NAME_LEN];
+    BookingNode *bookings_head; 
+    struct UserBookingsNode *left, *right;
+} UserBookingsNode;
 
+typedef struct MaxHeap {
+    Booking *array;
+    int size;
+    int capacity;
+} MaxHeap;
 
 // =================================================================================
 // BAGIAN 2: DEKLARASI FUNGSI (PROTOTYPES)
 // =================================================================================
-
 
 // --- Utilitas ---
 void clear_screen();
@@ -82,7 +91,7 @@ void press_enter_to_continue();
 void clean_input_buffer();
 void print_header(const char* text);
 void print_divider();
-//void get_current_datetime_string(char *buffer, int buffer_size);
+void swap_movies(Movie *a, Movie *b);
 
 // --- File I/O untuk file .txt ---
 int load_locations_from_txt(const char* filename, Location locations[], int max_items);
@@ -96,22 +105,39 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
 int change_location(Location locations[], int location_count);
 int find_cinemas_index(Cinema cinemas[], int cinema_count, int location_id);
 void print_cinemas(Cinema cinemas[], int index);
-void print_movies(Movie movies[], int movie_count, int upcoming, int current_film, int sort_ascending);
-void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id, Booking bookings[], int *booking_count);
-
-
-void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime showtimes[], int showtime_count, Booking bookings[], int *booking_count, Movie movies[], int movie_count);
+void print_movies(Movie movies[], int movie_count, int upcoming, int current_film, int sort_ascending, Movie sorted_movies[]);
+void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id, Booking bookings[], int *booking_count, UserBookingsNode** bookings_root, MaxHeap *recent_bookings_heap, char username[], bool login);
+void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime showtimes[], int showtime_count, Booking bookings[], int *booking_count, Movie movies[], int movie_count, UserBookingsNode** bookings_root, MaxHeap *recent_bookings_heap, char username[], bool login);
 int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id, int location_id);
-
-
 void seat_selection_flow(Showtime *selected_showtime, int seat_number, char *seat_temp);
 void display_seat_map(Showtime selected_showtime);
+void merge_sort_movies(Movie arr[], int l, int r);
+void merge_sort_cinemas(Cinema arr[], int l, int r);
+void selection_sort_movies_desc(Movie arr[], int n);
+
+// --- BST ---
+UserBookingsNode* addUserBooking(UserBookingsNode* root, Booking new_booking);
+void view_my_bookings(UserBookingsNode** bookings_root_ptr, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count);
+UserBookingsNode* findMinNode(UserBookingsNode* node);
+void deleteUserBooking(UserBookingsNode* userNode, int booking_index_to_delete, Showtime showtimes[], int showtime_count);
+UserBookingsNode* deleteUserNode(UserBookingsNode* root, const char* user_key);
+void freeUserBookingsTree(UserBookingsNode* root);
+
+// --- Heap ---
+MaxHeap* createHeap(int capacity);
+void insertIntoHeap(MaxHeap* heap, Booking new_booking);
+void viewRecentBookings(MaxHeap* heap, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count);
+void freeHeap(MaxHeap* heap);
+void deleteFromHeap(MaxHeap* heap, int booking_id_to_delete);
 
 
-void merge_sort_movies(Movie arr[], int l, int r, int ascending);
+// --- Binary Search ---
+void search_menu(Movie sorted_movies_ascending[], int movie_count, Cinema sorted_cinemas_ascending[], int cinema_count, Location locations[], int location_count);
+int binary_search_movie(Movie movies[], int count, const char* target);
+int binary_search_cinema(Cinema cinemas[], int count, const char* target);
 
 // =================================================================================
-// BAGIAN 4: IMPLEMENTASI FUNGSI UTAMA & MENU
+// BAGIAN 3: FUNGSI UTAMA & MENU
 // =================================================================================
 
 int main() {
@@ -138,15 +164,34 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
     int current_location_id = 1;
     int current_location_index = 0;
     int current_cinemas_index; 
+
+    UserBookingsNode *bookings_root = NULL;
+    MaxHeap* recent_bookings_heap = createHeap(MAX_BOOKINGS);
+
+    Movie sorted_movies_ascending[MAX_MOVIES];
+    memcpy(sorted_movies_ascending, movies, sizeof(Movie) * (*movie_count));
+    merge_sort_movies(sorted_movies_ascending, 0, *movie_count-1);
+
+    Cinema sorted_cinemas_ascending[MAX_CINEMAS];
+    memcpy(sorted_cinemas_ascending, cinemas, sizeof(Cinema) * (*cinema_count));
+    merge_sort_cinemas(sorted_cinemas_ascending, 0, *cinema_count-1);
+
+    char username[MAX_NAME_LEN];
+    char password[MAX_PASSWORD_LEN];
+    bool login = false; 
+
     do {
         print_header("CINEMA XXI - GROUP 2");
         printf("Location -> %s\n", locations[current_location_index].name);
-        printf("[0] Exit\n");
+        printf("[0] Cari film atau bioskop\n");
         printf("[1] Bioskop\n");
         printf("[2] Film\n");
-        printf("[3] m.food\n");
-        printf("[4] Pesanan Saya\n");
-        printf("[5] Change location\n");
+        printf("[3] Pesanan Saya\n");
+        printf("[4] Change location\n");
+        printf("[5] Pesanan saya\n");
+        printf("[6] History Pesanan\n");
+        printf("[7] %s\n", login ? "Logged" : "Login");
+        printf("[8] Exit\n");
         print_divider();
         printf("Pilihan Anda: ");
 
@@ -157,10 +202,11 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
 
         int temp;
         switch(choice) {
-            case 0:
+            case 0: 
                 clear_screen();
-                printf("Thankyou, see you next time!\n");
-                break; 
+                search_menu(sorted_movies_ascending, *movie_count, sorted_cinemas_ascending, *cinema_count, locations, *location_count);
+                break;
+
             case 1: 
                 clear_screen();
                 current_cinemas_index = find_cinemas_index(cinemas, *cinema_count, current_location_id); 
@@ -168,15 +214,12 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                 break; 
             case 2:
                 clear_screen();
-                film_menu(movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count, current_location_id, bookings, booking_count);
+                film_menu(movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count, current_location_id, bookings, booking_count, &bookings_root, recent_bookings_heap, username, login);
                 break; 
             case 3: 
                 clear_screen();
-                break; 
-            case 4: 
-                clear_screen();
                 break;
-            case 5: 
+            case 4: 
                 clear_screen();
                 print_header("Pilih lokasi kamu");
                 printf("Current Location -> %s\n", locations[current_location_index].name);
@@ -187,22 +230,56 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                     break;
                 }
                 break; 
+            case 5: 
+                clear_screen();
+                view_my_bookings(&bookings_root, movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count);
+                break; 
+            case 6: 
+                clear_screen();
+                viewRecentBookings(recent_bookings_heap, movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count);
+                break;
+            case 7: 
+                if (!login) {
+                    printf("Username: "); 
+                    scanf("%s", username);
+                    clean_input_buffer();
+
+                    printf("Password: ");
+                    scanf("%s", password);
+                    clean_input_buffer();
+
+                    login = true; 
+                    clear_screen();
+                } else {
+                    printf("Already logged!\n");
+                } 
+                break; 
+            case 8:
+                clear_screen();
+                printf("Thankyou, see you next time!\n");
+                break; 
             default: 
                 printf("Input tidak valid!\n");
                 press_enter_to_continue();
                 break; 
         } 
-    } while(choice != 0);
+    } while(choice != 8);
+
+    freeUserBookingsTree(bookings_root);
+    freeHeap(recent_bookings_heap);
 }
 
-void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id, Booking bookings[], int *booking_count) {
+void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count, int location_id, Booking bookings[], int *booking_count, UserBookingsNode **bookings_root, MaxHeap *recent_bookings_heap, char username[], bool login) {
     int choice;
-    int current_film = 1;
+    Movie sorted_movies[MAX_MOVIES];
+    memcpy(&sorted_movies, movies, sizeof(Movie));
+    int current_film;
     int selected_cinema_id;
-    int selected_movie_id = movies[current_film-1].movie_id;
-    int sort_ascending = 1; 
+    int selected_movie_id;
+    int sort_ascending = 1;
+
     do {
-        print_movies(movies, movie_count, 0, current_film, sort_ascending);
+        print_movies(movies, movie_count, 0, current_film, sort_ascending, sorted_movies);
         print_header("FILM MAIN MENU");
         printf("[0] Back\n");
         printf("[1] Akan tayang\n");
@@ -223,7 +300,7 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
                 break; 
             case 1:
                 clear_screen();
-                print_movies(movies, movie_count, 1, 0, sort_ascending);
+                print_movies(movies, movie_count, 1, 0, sort_ascending, sorted_movies);
                 press_enter_to_continue();
                 clear_screen();
                 break; 
@@ -232,14 +309,18 @@ void film_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_cou
                 scanf("%d", &current_film);
                 clean_input_buffer();
                 clear_screen();
+                selected_movie_id = sorted_movies[current_film-1].movie_id;
                 break;
             case 3:
                 clear_screen();
                 selected_cinema_id = select_cinema(showtimes, showtime_count, cinemas, cinema_count, selected_movie_id, location_id);
-                buy_ticket_flow(selected_movie_id, selected_cinema_id, showtimes, showtime_count, bookings, booking_count, movies, movie_count);
+                if (selected_cinema_id == -1) { clear_screen(); break; } 
+                buy_ticket_flow(selected_movie_id, selected_cinema_id, showtimes, showtime_count, bookings, booking_count, movies, movie_count, bookings_root, recent_bookings_heap, username, login);
                 break;
             case 4: 
                 sort_ascending = !sort_ascending; 
+                current_film = selected_movie_id = -1;
+                clear_screen();
                 break; 
             default: 
                 printf("Input tidak valid!\n");
@@ -259,59 +340,128 @@ void load_all_data(Location all_locations[], Cinema all_cinemas[], Movie all_mov
 }
 
 // =================================================================================
-// BAGIAN 5: IMPLEMENTASI FILE I/O UNTUK .TXT
+// BAGIAN 4: IMPLEMENTASI Binary Search untuk FITUR SEARCH
 // =================================================================================
-int load_locations_from_txt(const char* filename, Location locations[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d, %[^\n]\n", &locations[count].location_id, locations[count].name) == 2) { count++; }
 
-    fclose(fp);
-    return count; 
-}
+void search_menu(Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Location locations[], int location_count) {
+    int choice;
+    print_header("MENU PENCARIAN");
+    printf("[1] Cari Judul Film\n");
+    printf("[2] Cari Nama Bioskop\n");
+    printf("[0] Kembali\n");
+    print_divider();
+    printf("Pilihan Anda: ");
 
-int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d, %d, %[^\n]\n", &cinemas[count].cinema_id, &cinemas[count].location_id, cinemas[count].name) == 3) { count++; }
-
-    fclose(fp);
-    return count; 
-}
-
-int load_movies_from_txt(const char* filename, Movie movies[], int max_items) {
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0;
-    int count = 0;
-    char line_buffer[MAX_LINE_BUFFER];
-    while(count < max_items && fgets(line_buffer, sizeof(line_buffer), fp)) {
-        sscanf(line_buffer, "%d,%[^,],%[^,],%d,%[^,],%d",
-               &movies[count].movie_id, movies[count].title, movies[count].genre,
-               &movies[count].duration_minutes, movies[count].age_rating, &movies[count].upcoming);
-        count++;
+    if (scanf("%d", &choice) != 1) {
+        choice = -1;
+        clean_input_buffer();
     }
+    
+    char search_term[MAX_NAME_LEN];
+    int result_index = -1;
 
-    fclose(fp);
-    return count;
+    switch(choice) {
+        case 1:
+            printf("Masukkan judul film yang dicari (harus sama persis): ");
+            clean_input_buffer();
+            fgets(search_term, MAX_NAME_LEN, stdin);
+            search_term[strcspn(search_term, "\n")] = 0;
+            
+            result_index = binary_search_movie(movies, movie_count, search_term);
+            
+            clear_screen();
+            print_header("Hasil Pencarian Film");
+            if (result_index != -1) {
+                printf("Film Ditemukan!\n");
+                print_divider();
+                printf("Judul    : %s\n", movies[result_index].title);
+                printf("Genre    : %s\n", movies[result_index].genre);
+                printf("Durasi   : %d menit\n", movies[result_index].duration_minutes);
+                printf("Rating   : %s\n", movies[result_index].age_rating);
+            } else {
+                printf("Film dengan judul '%s' tidak ditemukan.\n", search_term);
+            }
+            press_enter_to_continue();
+            break;
+        case 2:
+            printf("Masukkan nama bioskop yang dicari (harus sama persis): ");
+            clean_input_buffer();
+            fgets(search_term, MAX_NAME_LEN, stdin);
+            search_term[strcspn(search_term, "\n")] = 0;
+
+            result_index = binary_search_cinema(cinemas, cinema_count, search_term);
+
+            clear_screen();
+            print_header("Hasil Pencarian Bioskop");
+            if (result_index != -1) {
+                printf("Bioskop Ditemukan!\n");
+                print_divider();
+                printf("Nama     : %s\n", cinemas[result_index].name);
+
+                char* loc_name = "N/A";
+                for(int i = 0; i < location_count; i++){
+                    if(locations[i].location_id == cinemas[result_index].location_id){
+                        loc_name = locations[i].name;
+                        break;
+                    }
+                }
+                printf("Lokasi   : %s\n", loc_name);
+            } else {
+                printf("Bioskop dengan nama '%s' tidak ditemukan.\n", search_term);
+            }
+            press_enter_to_continue();
+            break;
+        case 0:
+            break;
+        default:
+            printf("Pilihan tidak valid.\n");
+            press_enter_to_continue();
+            break;
+    }
 }
 
-int load_showtimes_from_txt(const char* filename, Showtime showtimes[], int max_items)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp) return 0; 
-    int count = 0; 
-    while(count < max_items && fscanf(fp, "%d,%d,%d,%[^,],%d", &showtimes[count].show_id, &showtimes[count].movie_id, &showtimes[count].cinema_id, showtimes[count].show_time, &showtimes[count].price) == 5) { count++; }
+int binary_search_movie(Movie movies[], int count, const char* target) {
+    int low = 0;
+    int high = count - 1;
+    
+    while(low <= high) {
+        int mid = low + (high - low) / 2;
+        int cmp = strcasecmp(movies[mid].title, target);
 
-    fclose(fp);
-    return count; 
+        if (cmp == 0) {
+            return mid; 
+        }
+        if (cmp < 0) {
+            low = mid + 1; 
+        } else {
+            high = mid - 1; 
+        }
+    }
+    return -1; 
 }
- 
+
+int binary_search_cinema(Cinema cinemas[], int count, const char* target) {
+    int low = 0;
+    int high = count - 1;
+    
+    while(low <= high) {
+        int mid = low + (high - low) / 2;
+        int cmp = strcasecmp(cinemas[mid].name, target);
+
+        if (cmp == 0) {
+            return mid;
+        }
+        if (cmp < 0) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return -1;
+}
+
 // =================================================================================
-// BAGIAN 6: IMPLEMENTASI LOGIKA APLIKASI
+// BAGIAN 5: IMPLEMENTASI LOGIKA APLIKASI
 // =================================================================================
 
 int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], int cinema_count, int selected_movie_id, int location_id) {
@@ -338,15 +488,22 @@ int select_cinema(Showtime showtimes[], int showtime_count, Cinema cinemas[], in
             }
         }
     }
+    if (k == 1) {
+        printf("Tidak ada bioskop di lokasi ini yang menayangkan film tersebut.\n");
+        press_enter_to_continue();
+        return -1;
+    }
+
     print_divider();
     printf("Pilih bioskop: ");
     scanf("%d", &choice);
     clean_input_buffer();
 
-    return cinemas_id[choice];
+    if(choice > 0 && choice < k) return cinemas_id[choice];
+        return -1;
 }
 
-void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime showtimes[], int showtime_count, Booking bookings[], int *booking_count, Movie movies[], int movie_count) {
+void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime showtimes[], int showtime_count, Booking bookings[], int *booking_count, Movie movies[], int movie_count, UserBookingsNode** bookings_root, MaxHeap *recent_bookings_heap, char username[], bool login) {
     clear_screen();
 
     int available_shows[MAX_SHOWTIMES];
@@ -394,11 +551,13 @@ void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime sho
     printf("%s\n", selected_showtime->show_time);
     
     int jumlah_tiket;
-    printf("Butuh berapa tiket? (number): ");
-    clean_input_buffer();
+    printf("Butuh berapa tiket? (1-%d): ", MAX_SEATS_PER_BOOKING);
     scanf("%d", &jumlah_tiket);
-
-    press_enter_to_continue();
+    if (jumlah_tiket <= 0 || jumlah_tiket > MAX_SEATS_PER_BOOKING) {
+        printf("Jumlah tiket tidak valid.\n");
+        press_enter_to_continue();
+        return;
+    }
 
 
     // 4. proses pemilihan kursi & booking 
@@ -407,8 +566,15 @@ void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime sho
     new_booking.show_id = selected_showtime->show_id;
     new_booking.num_selected_seats = jumlah_tiket;
     new_booking.total_price = jumlah_tiket * selected_showtime->price;
-    // copy user name to booking
-    //strcpy(new_booking.user, "user_name"); 
+
+    if (login) {
+        strcpy(new_booking.user, username); 
+    } else {
+        printf("Silahkan login terlebih dahulu!\n");
+        press_enter_to_continue();
+        clear_screen();
+        return;
+    }
 
     for (int i = 0; i < jumlah_tiket; i++) {
         char seat_temp[5]; 
@@ -442,14 +608,25 @@ void buy_ticket_flow(int selected_movie_id, int selected_cinema_id, Showtime sho
     printf("Konfirmasi pemesanan? (y/n): ");
     
     char confirmation;
-    clean_input_buffer();
     scanf(" %c", &confirmation);
 
     if (tolower(confirmation) == 'y') {
+
         bookings[*booking_count] = new_booking;
         (*booking_count)++; 
+        *bookings_root = addUserBooking(*bookings_root, new_booking);
+        insertIntoHeap(recent_bookings_heap, new_booking);
         printf("\nSelamat! Pemesanan berhasil dibuat.\n");
+
     } else {
+
+        for(int i=0; i<new_booking.num_selected_seats; i++){
+            int row = toupper(new_booking.selected_seats[i][0]) - 'A';
+            int col = atoi(&new_booking.selected_seats[i][1]) - 1;
+            if(row >= 0 && row < MAX_ROWS && col >= 0 && col < MAX_COLS){
+                selected_showtime->seats[row][col] = 0;
+            }
+        }
         printf("\nPemesanan dibatalkan.\n");
     }
     press_enter_to_continue();
@@ -553,27 +730,11 @@ void print_cinemas(Cinema cinemas[], int index) {
 
 }
 
-void print_movies(Movie movies[], int movie_count, int upcoming, int current_film, int ascending) {
+void print_movies(Movie movies[], int movie_count, int upcoming, int current_film, int ascending, Movie sorted_movies[]) {
 
     print_header("Film");
     
     if (movie_count <= 0) return;
-    /*
-    if (upcoming)
-        printf("Akan tayang\n\n");
-    else 
-        printf("Lagi tayang\n\n");
-
-    for(int i = 0; i < movie_count; i++) {
-        if (upcoming && movies[i].upcoming)
-            printf("%-3s [%2d] %-20s\n", "   ", (i-20)+1, movies[i].title);
-        else if (!upcoming && !movies[i].upcoming) {
-            if (current_film == i+1) printf("%-3s [%2d] %-20s\n", "-->", i+1, movies[i].title);
-            else 
-                printf("%-3s [%2d] %-20s\n", "   ", i+1, movies[i].title);
-        }
-    }
-    */
 
     int temp_count = 0;
     for (int i = 0; i < movie_count; i++) {
@@ -586,31 +747,32 @@ void print_movies(Movie movies[], int movie_count, int upcoming, int current_fil
         return;
     }
 
-    Movie temp_movies[temp_count];
     int idx = 0;
     for (int i = 0; i < movie_count; i++) {
         if ((upcoming && movies[i].upcoming) || (!upcoming && !movies[i].upcoming)) {
-            temp_movies[idx++] = movies[i];
+            sorted_movies[idx++] = movies[i];
         }
     }
 
-    merge_sort_movies(temp_movies, 0, temp_count - 1, ascending);
+    if (ascending) {
+        merge_sort_movies(sorted_movies, 0, temp_count - 1);
+    } else {
+        selection_sort_movies_desc(sorted_movies, temp_count);
+    }
 
     if (upcoming)
-        printf("== Akan Tayang ==\n");
+        printf("Akan tayang\n");
     else
-        printf("== Lagi Tayang ==\n");
+        printf("Lagi tayang\n");
 
     for (int i = 0; i < temp_count; i++) {
-        if (!upcoming && current_film == i + 1) printf("-->");
-        else printf("   ");
-        printf("%d. %s\n", i + 1, temp_movies[i].title);
+        if (!upcoming && current_film == i + 1) printf("%-3s [%2d] %-20s\n", "-->", i+1, sorted_movies[i].title);
+        else printf("%-3s [%2d] %-20s\n", "   ", i+1, sorted_movies[i].title);
+
     }
 }
 
-
-
-void merge(Movie arr[], int l, int m, int r, int ascending) {
+void merge(Movie arr[], int l, int m, int r) {
     int i, j, k;
     int n1 = m - l + 1;
     int n2 = r - m;
@@ -627,8 +789,8 @@ void merge(Movie arr[], int l, int m, int r, int ascending) {
     k = l;
 
     while (i < n1 && j < n2) {
-        int cmp = strcmp(L[i].title, R[j].title);
-        if ((ascending && cmp <= 0) || (!ascending && cmp > 0)) {
+        int cmp = strcasecmp(L[i].title, R[j].title);
+        if (cmp <= 0) {
             arr[k++] = L[i++];
         } else {
             arr[k++] = R[j++];
@@ -639,17 +801,476 @@ void merge(Movie arr[], int l, int m, int r, int ascending) {
     while (j < n2) arr[k++] = R[j++];
 }
 
-void merge_sort_movies(Movie arr[], int l, int r, int ascending) {
+void merge_sort_movies(Movie arr[], int l, int r) {
     if (l < r) {
         int m = l + (r - l) / 2;
-        merge_sort_movies(arr, l, m, ascending);
-        merge_sort_movies(arr, m + 1, r, ascending);
-        merge(arr, l, m, r, ascending);
+        merge_sort_movies(arr, l, m);
+        merge_sort_movies(arr, m + 1, r);
+        merge(arr, l, m, r);
+    }
+}
+
+void merge_cinemas(Cinema arr[], int l, int m, int r) {
+    int i, j, k;
+    int n1 = m - l + 1;
+    int n2 = r - m;
+
+    Cinema L[n1], R[n2];
+    for (i = 0; i < n1; i++) L[i] = arr[l + i];
+    for (j = 0; j < n2; j++) R[j] = arr[m + 1 + j];
+
+    i = 0; j = 0; k = l;
+    while (i < n1 && j < n2) {
+        if (strcasecmp(L[i].name, R[j].name) <= 0) arr[k++] = L[i++];
+        else arr[k++] = R[j++];
+    }
+    while (i < n1) arr[k++] = L[i++];
+    while (j < n2) arr[k++] = R[j++];
+}
+
+void merge_sort_cinemas(Cinema arr[], int l, int r) {
+    if (l < r) {
+        int m = l + (r - l) / 2;
+        merge_sort_cinemas(arr, l, m);
+        merge_sort_cinemas(arr, m + 1, r);
+        merge_cinemas(arr, l, m, r);
+    }
+}
+
+void selection_sort_movies_desc(Movie arr[], int n) {
+    int i, j, max_idx;
+
+    for (i = 0; i < n - 1; i++) {
+        max_idx = i;
+
+        for (j = i + 1; j < n; j++) {
+            if (strcasecmp(arr[j].title, arr[max_idx].title) > 0) {
+                max_idx = j;
+            }
+        }
+        if (max_idx != i) {
+            swap_movies(&arr[i], &arr[max_idx]);
+        }
     }
 }
 
 // =================================================================================
-// BAGIAN 7: UTILITAS INTERNAL & INISIALISASI DATA
+// BAGIAN 6: Binary Search Tree untuk PESANAN SAYA 
+// =================================================================================
+
+UserBookingsNode* addUserBooking(UserBookingsNode* root, Booking new_booking) {
+    if (root == NULL) {
+        root = (UserBookingsNode*)malloc(sizeof(UserBookingsNode));
+        strcpy(root->user, new_booking.user);
+        root->left = root->right = NULL;
+        root->bookings_head = NULL;
+    }
+
+    int cmp = strcmp(new_booking.user, root->user);
+
+    if (cmp == 0) {
+        BookingNode* new_booking_node = (BookingNode*)malloc(sizeof(BookingNode));
+        new_booking_node->booking_data = new_booking;
+        new_booking_node->next = root->bookings_head;
+        root->bookings_head = new_booking_node;
+    } else if (cmp < 0) {
+        root->left = addUserBooking(root->left, new_booking);
+    } else {
+        root->right = addUserBooking(root->right, new_booking);
+    }
+    return root;
+}
+
+void deleteUserBooking(UserBookingsNode* userNode, int booking_index_to_delete, Showtime showtimes[], int showtime_count) {
+    if (userNode == NULL || userNode->bookings_head == NULL) return;
+
+    BookingNode* current = userNode->bookings_head;
+    BookingNode* prev = NULL;
+    int current_index = 1;
+
+    while (current != NULL && current_index < booking_index_to_delete) {
+        prev = current;
+        current = current->next;
+        current_index++;
+    }
+
+    if (current == NULL) {
+        printf("Nomor pesanan tidak ditemukan.\n");
+        return;
+    }
+
+    Booking deleted_booking = current->booking_data;
+
+    if (prev == NULL) {
+        userNode->bookings_head = current->next;
+    } else {
+        prev->next = current->next;
+    }
+    free(current);
+
+    for (int i = 0; i < showtime_count; i++) {
+        if (showtimes[i].show_id == deleted_booking.show_id) {
+            for (int j = 0; j < deleted_booking.num_selected_seats; j++) {
+                int row = toupper(deleted_booking.selected_seats[j][0]) - 'A';
+                int col = atoi(&deleted_booking.selected_seats[j][1]) - 1;
+                if (row >= 0 && row < MAX_ROWS && col >= 0 && col < MAX_COLS) {
+                    showtimes[i].seats[row][col] = 0;
+                }
+            }
+            break;
+        }
+    }
+    printf("Pesanan berhasil dibatalkan dan kursi telah tersedia kembali.\n");
+}
+
+UserBookingsNode* findMinNode(UserBookingsNode* node) {
+    UserBookingsNode* current = node;
+    while (current && current->left != NULL) {
+        current = current->left;
+    }
+    return current;
+}
+
+UserBookingsNode* deleteUserNode(UserBookingsNode* root, const char* user_key) {
+    if (root == NULL) return root;
+
+    int cmp = strcmp(user_key, root->user);
+
+    if (cmp < 0) {
+        root->left = deleteUserNode(root->left, user_key);
+    } else if (cmp > 0) {
+        root->right = deleteUserNode(root->right, user_key);
+    } else { 
+        // if node punya <= 1 child 
+        if (root->left == NULL) {
+            UserBookingsNode* temp = root->right;
+            free(root);
+            return temp;
+        } else if (root->right == NULL) {
+            UserBookingsNode* temp = root->left;
+            free(root);
+            return temp;
+        }
+
+        // if node punya 2 child
+        UserBookingsNode* temp = findMinNode(root->right); 
+        strcpy(root->user, temp->user); 
+        root->bookings_head = temp->bookings_head; 
+        
+        root->right = deleteUserNode(root->right, temp->user);
+    }
+    return root;
+}
+
+void view_my_bookings(UserBookingsNode** bookings_root_ptr, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count) {
+    print_header("PESANAN SAYA");
+    if (*bookings_root_ptr == NULL) {
+        printf("Belum ada pesanan yang dibuat dalam sesi ini.\n");
+        press_enter_to_continue();
+        return;
+    }
+    
+    char search_user[MAX_NAME_LEN];
+    printf("Masukkan nama Anda untuk mencari pesanan: ");
+    clean_input_buffer();
+    fgets(search_user, MAX_NAME_LEN, stdin);
+    search_user[strcspn(search_user, "\n")] = 0;
+
+    UserBookingsNode* userNode = *bookings_root_ptr;
+    while (userNode != NULL) {
+        int cmp = strcmp(search_user, userNode->user);
+        if (cmp == 0) break;
+        if (cmp < 0) userNode = userNode->left;
+        else userNode = userNode->right;
+    }
+    
+    bool still_in_menu;
+    if (userNode == NULL || userNode->bookings_head == NULL) {
+        printf("\nTidak ada pesanan yang ditemukan untuk pengguna '%s'.\n", search_user);
+    } else {
+        still_in_menu = true;
+        while(still_in_menu) {
+            clear_screen();
+            printf("\nMenampilkan pesanan untuk: %s\n", userNode->user);
+            BookingNode* booking_ptr = userNode->bookings_head;
+            int booking_num = 1;
+
+            if (booking_ptr == NULL) {
+                printf("Anda tidak memiliki pesanan aktif.\n");
+                break;
+            }
+
+            while (booking_ptr != NULL) {
+                print_divider();
+                Booking b = booking_ptr->booking_data;
+                char* title = "N/A"; char* cinema_name = "N/A"; char* show_time = "N/A";
+                for(int i=0; i<showtime_count; i++){
+                    if(showtimes[i].show_id == b.show_id){
+                        show_time = showtimes[i].show_time;
+                        for(int j=0; j<movie_count; j++) if(movies[j].movie_id == showtimes[i].movie_id) title = movies[j].title;
+                        for(int j=0; j<cinema_count; j++) if(cinemas[j].cinema_id == showtimes[i].cinema_id) cinema_name = cinemas[j].name;
+                        break;
+                    }
+                }
+                printf("[%d] Film    : %s\n", booking_num, title);
+                printf("    Bioskop : %s\n", cinema_name);
+                printf("    Jadwal  : %s\n", show_time);
+                printf("    Kursi   : ");
+                for(int i=0; i<b.num_selected_seats; i++) printf("%s ", b.selected_seats[i]);
+                printf("\n    Total   : Rp%d\n", b.total_price);
+                
+                booking_ptr = booking_ptr->next;
+                booking_num++;
+            }
+            
+            print_divider();
+            printf("\n[1] Batalkan Pesanan\n");
+            printf("[0] Kembali\n");
+            printf("Pilihan Anda: ");
+            int choice;
+            scanf("%d", &choice);
+            if (choice == 1) {
+                printf("Masukkan nomor pesanan yang ingin dibatalkan: ");
+                int booking_to_delete;
+                scanf("%d", &booking_to_delete);
+                if(booking_to_delete > 0 && booking_to_delete < booking_num){
+                    deleteUserBooking(userNode, booking_to_delete, showtimes, showtime_count);
+                    if (userNode->bookings_head == NULL) {
+                        *bookings_root_ptr = deleteUserNode(*bookings_root_ptr, userNode->user);
+                        still_in_menu = false; 
+                    }
+                } else {
+                    printf("Nomor pesanan tidak valid.\n");
+                }
+                press_enter_to_continue();
+            } else {
+                still_in_menu = false;
+            }
+        }
+    }
+    if(!still_in_menu) return; 
+    press_enter_to_continue();
+}
+
+void freeUserBookingsTree(UserBookingsNode* root) {
+    if (root == NULL) return;
+    freeUserBookingsTree(root->left);
+    freeUserBookingsTree(root->right);
+
+    BookingNode* current = root->bookings_head;
+    while(current != NULL){
+        BookingNode* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    free(root);
+}
+
+// =================================================================================
+// BAGIAN 7: HEAP untuk Riwayat Pesanan
+// =================================================================================
+
+MaxHeap* createHeap(int capacity) {
+    MaxHeap* heap = (MaxHeap*)malloc(sizeof(MaxHeap));
+    heap->array = (Booking*)malloc(capacity * sizeof(Booking));
+    heap->size = 0;
+    heap->capacity = capacity;
+    return heap;
+}
+
+void swap(Booking* a, Booking* b) {
+    Booking temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+void siftUp(MaxHeap* heap, int index) {
+    int parent = (index - 1) / 2;
+    if (parent >= 0 && heap->array[parent].booking_id < heap->array[index].booking_id) {
+        swap(&heap->array[parent], &heap->array[index]);
+        siftUp(heap, parent);
+    }
+}
+
+void insertIntoHeap(MaxHeap* heap, Booking new_booking) {
+    if (heap->size == heap->capacity) {
+        printf("Heap penuh, pesanan tidak bisa ditambahkan ke riwayat terbaru.\n");
+        return;
+    }
+    heap->size++;
+    int index = heap->size - 1;
+    heap->array[index] = new_booking;
+    siftUp(heap, index);
+}
+
+void siftDown(Booking arr[], int size, int index) {
+    int largest = index;
+    int left = 2 * index + 1;
+    int right = 2 * index + 2;
+
+    if (left < size && arr[left].booking_id > arr[largest].booking_id)
+        largest = left;
+
+    if (right < size && arr[right].booking_id > arr[largest].booking_id)
+        largest = right;
+
+    if (largest != index) {
+        swap(&arr[index], &arr[largest]);
+        siftDown(arr, size, largest);
+    }
+}
+
+void viewRecentBookings(MaxHeap* heap, Movie movies[], int movie_count, Cinema cinemas[], int cinema_count, Showtime showtimes[], int showtime_count) {
+
+    int choice; 
+    do {
+        print_header("RIWAYAT PESANAN dari TERBARU");
+        if (heap->size == 0) {
+            printf("Belum ada pesanan yang dibuat dalam sesi ini.\n");
+            press_enter_to_continue();
+            return;
+        }
+
+        Booking temp_array[heap->size];
+        memcpy(temp_array, heap->array, heap->size * sizeof(Booking));
+        int temp_size = heap->size;
+
+        for (int i = 0; i < heap->size; i++) {
+            Booking b = temp_array[0];
+
+            print_divider();
+            char* title = "N/A"; char* cinema_name = "N/A"; char* show_time = "N/A";
+            for(int k = 0; k < showtime_count; k++){
+                if(showtimes[k].show_id == b.show_id){
+                    show_time = showtimes[k].show_time;
+                    for(int j = 0; j<movie_count; j++) 
+                        if(movies[j].movie_id == showtimes[k].movie_id) title = movies[j].title;
+                    for(int j = 0; j<cinema_count; j++) 
+                        if(cinemas[j].cinema_id == showtimes[k].cinema_id) cinema_name = cinemas[j].name;
+                    break;
+                }
+            }
+            printf("Pengguna: %s (ID Pesanan: %d)\n", b.user, b.booking_id);
+            printf("Film    : %s\n", title);
+            printf("Bioskop : %s @ %s\n", cinema_name, show_time);
+            
+            if (i < temp_size - 1) {
+                temp_array[0] = temp_array[temp_size - 1];
+                temp_size--;
+                siftDown(temp_array, temp_size, 0);
+            }
+        }
+       
+        print_divider();
+        printf("\n[1] Hapus riwayat terbaru\n");
+        printf("[0] Kembali\n");
+        printf("Pilihan Anda: ");
+        scanf("%d", &choice);
+
+        if (choice == 1) {
+            printf("Masukkan nomor pesanan yang ingin dibatalkan: ");
+            int booking_to_delete;
+            clean_input_buffer();
+            scanf("%d", &booking_to_delete);
+            clean_input_buffer();
+
+            if(booking_to_delete > 0 && booking_to_delete <= heap->size){
+                deleteFromHeap(heap, booking_to_delete);
+                
+            } else {
+                printf("Nomor pesanan tidak valid.\n");
+            }
+            press_enter_to_continue();
+        } 
+
+    } while(choice != 0);
+}
+
+void deleteFromHeap(MaxHeap* heap, int booking_id_to_delete) {
+    if (heap->size == 0) return;
+
+    int index_to_delete = -1;
+    for (int i = 0; i < heap->size; i++) {
+        if (heap->array[i].booking_id == booking_id_to_delete) {
+            index_to_delete = i;
+            break;
+        }
+    }
+    
+    if (index_to_delete == -1) return; 
+
+    heap->array[index_to_delete] = heap->array[heap->size - 1];
+    heap->size--;
+
+    int parent = (index_to_delete - 1) / 2;
+    if (index_to_delete > 0 && heap->array[parent].booking_id < heap->array[index_to_delete].booking_id) {
+        siftUp(heap, index_to_delete);
+    } else {
+        siftDown(heap->array, heap->size, index_to_delete);
+    }
+}
+
+void freeHeap(MaxHeap* heap) {
+    if (heap == NULL) return;
+    free(heap->array);
+    free(heap);
+}
+
+
+// =================================================================================
+// BAGIAN 8: IMPLEMENTASI FILE I/O UNTUK .TXT
+// =================================================================================
+int load_locations_from_txt(const char* filename, Location locations[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %[^\n]\n", &locations[count].location_id, locations[count].name) == 2) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
+int load_cinemas_from_txt(const char* filename, Cinema cinemas[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %d, %[^\n]\n", &cinemas[count].cinema_id, &cinemas[count].location_id, cinemas[count].name) == 3) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
+int load_movies_from_txt(const char* filename, Movie movies[], int max_items) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0;
+    int count = 0;
+    char line_buffer[MAX_LINE_BUFFER];
+    while(count < max_items && fgets(line_buffer, sizeof(line_buffer), fp)) {
+        sscanf(line_buffer, "%d, %[^,], %[^,], %d, %[^,], %d",
+               &movies[count].movie_id, movies[count].title, movies[count].genre,
+               &movies[count].duration_minutes, movies[count].age_rating, &movies[count].upcoming);
+        count++;
+    }
+
+    fclose(fp);
+    return count;
+}
+
+int load_showtimes_from_txt(const char* filename, Showtime showtimes[], int max_items)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return 0; 
+    int count = 0; 
+    while(count < max_items && fscanf(fp, "%d, %d, %d, %[^,], %d", &showtimes[count].show_id, &showtimes[count].movie_id, &showtimes[count].cinema_id, showtimes[count].show_time, &showtimes[count].price) == 5) { count++; }
+
+    fclose(fp);
+    return count; 
+}
+
+// =================================================================================
+// BAGIAN 9: UTILITAS INTERNAL
 // =================================================================================
 
 void print_header(const char* text) {
@@ -667,8 +1288,6 @@ void clean_input_buffer() {
     while ((c = getchar()) != '\n' && c != EOF);
 }
 
-
-
 void clear_screen() {
     #ifdef _WIN32
         system("cls");
@@ -683,4 +1302,8 @@ void press_enter_to_continue() {
     getchar();
 }
 
-
+void swap_movies(Movie *a, Movie *b) {
+    Movie temp = *a;
+    *a = *b;
+    *b = temp;
+}
