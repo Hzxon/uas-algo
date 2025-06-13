@@ -186,12 +186,11 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
         printf("[0] Cari film atau bioskop\n");
         printf("[1] Bioskop\n");
         printf("[2] Film\n");
-        printf("[3] Pesanan Saya\n");
-        printf("[4] Change location\n");
-        printf("[5] Pesanan saya\n");
-        printf("[6] History Pesanan\n");
-        printf("[7] %s\n", login ? "Logged" : "Login");
-        printf("[8] Exit\n");
+        printf("[3] Change location\n");
+        printf("[4] Pesanan saya\n");
+        printf("[5] History Pesanan\n");
+        printf("[6] %s\n", login ? "Ganti User" : "Login");
+        printf("[7] Exit\n");
         print_divider();
         printf("Pilihan Anda: ");
 
@@ -218,9 +217,6 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                 break; 
             case 3: 
                 clear_screen();
-                break;
-            case 4: 
-                clear_screen();
                 print_header("Pilih lokasi kamu");
                 printf("Current Location -> %s\n", locations[current_location_index].name);
 
@@ -230,31 +226,27 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                     break;
                 }
                 break; 
-            case 5: 
+            case 4: 
                 clear_screen();
                 view_my_bookings(&bookings_root, movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count);
                 break; 
-            case 6: 
+            case 5: 
                 clear_screen();
                 viewRecentBookings(recent_bookings_heap, movies, *movie_count, cinemas, *cinema_count, showtimes, *showtime_count);
                 break;
-            case 7: 
-                if (!login) {
-                    printf("Username: "); 
-                    scanf("%s", username);
-                    clean_input_buffer();
+            case 6: 
+                printf("Username: "); 
+                scanf("%s", username);
+                clean_input_buffer();
 
-                    printf("Password: ");
-                    scanf("%s", password);
-                    clean_input_buffer();
+                printf("Password: ");
+                scanf("%s", password);
+                clean_input_buffer();
 
-                    login = true; 
-                    clear_screen();
-                } else {
-                    printf("Already logged!\n");
-                } 
+                login = true; 
+                clear_screen();
                 break; 
-            case 8:
+            case 7:
                 clear_screen();
                 printf("Thankyou, see you next time!\n");
                 break; 
@@ -263,7 +255,7 @@ void main_menu(Location locations[], Cinema cinemas[], Movie movies[], Showtime 
                 press_enter_to_continue();
                 break; 
         } 
-    } while(choice != 8);
+    } while(choice != 7);
 
     freeUserBookingsTree(bookings_root);
     freeHeap(recent_bookings_heap);
