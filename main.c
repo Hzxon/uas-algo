@@ -1144,7 +1144,7 @@ void viewRecentBookings(MaxHeap* heap, Movie movies[], int movie_count, Cinema c
         printf("Film    : %s\n", title);
         printf("Bioskop : %s @ %s\n", cinema_name, show_time);
         
-        if (i < temp_size - 1) {
+        if (i < heap->size - 1) {
             temp_array[0] = temp_array[temp_size - 1];
             temp_size--;
             siftDown(temp_array, temp_size, 0);
